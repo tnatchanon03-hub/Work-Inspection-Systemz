@@ -87,6 +87,10 @@ button.ghost{width:100%;min-height:48px;margin-top:10px;font-size:16px;font-fami
       <select id="crew"></select>
       <div class="err" id="e_crew"></div>
 
+      <label class="f" for="sup" id="l_sup"></label>
+      <select id="sup"></select>
+      <div class="err" id="e_sup"></div>
+
       <label class="f" id="l_urg"></label>
       <div id="urgList" role="radiogroup" aria-labelledby="l_urg"></div>
       <div class="callout" id="callout"></div>
@@ -109,9 +113,12 @@ button.ghost{width:100%;min-height:48px;margin-top:10px;font-size:16px;font-fami
 <script>
 /* ===================== ตั้งค่า (แก้ 3 จุดนี้) ===================== */
 const CONFIG = {
-  LIFF_ID:  'ใส่ LIFF ID ที่นี่',
-  ENDPOINT: 'ใส่ URL Webhook ของ Make (Scenario รับ Defect) ที่นี่',
-  CREWS:    ['ชุด 1', 'ชุด 2', 'ชุด 3']   /* ให้ตรงกับแท็บ Crews ในชีต */
+  LIFF_ID:  '2012189042-jm1zJsWr',
+  ENDPOINT: 'https://hook.us2.make.com/5l6eixe9qfg97jm6l6k2fq75pnkoxi77',
+  /* รายชื่อสำรอง ใช้เมื่อโหลดรายชื่อจากชีตไม่ได้
+     ปกติฟอร์มดึงรายชื่อล่าสุดจากชีต (แท็บ Crews และ Users) เอง เพิ่มคนในชีตได้เลยโดยไม่ต้องแก้ไฟล์นี้ */
+  CREWS:       ['ช่างม่อน', 'ช่างซอ', 'ช่างเทียร์', 'ช่างเหล็ก', 'ช่างมานะ'],
+  SUPERVISORS: ['ช่างโต้ง', 'ช่างนน', 'ช่างเทียน', 'ช่างเอี่ยว']
 };
 
 /* ===================== ข้อความหลายภาษา =====================
@@ -120,8 +127,8 @@ const CONFIG = {
 const T = {
   th: {
     title:'แจ้ง Defect', loc:'ตำแหน่ง', locPh:'เช่น คาน B3 ชั้น 2', work:'งาน', workPh:'เช่น เหล็กปลอกไม่ครบ',
-    crew:'ชุดรับผิดชอบ', crewPh:'เลือกชุด', urg:'ความเร่งด่วน', send:'ส่ง', sending:'กำลังส่ง...',
-    needLoc:'ใส่ตำแหน่ง', needWork:'ใส่งานที่ต้องแก้', needCrew:'เลือกชุด', needUrg:'เลือกความเร่งด่วน',
+    crew:'ชุดรับผิดชอบ', crewPh:'เลือกชุด', sup:'ผู้ดูแล', supPh:'เลือกผู้ดูแล', urg:'ความเร่งด่วน', send:'ส่ง', sending:'กำลังส่ง...',
+    needLoc:'ใส่ตำแหน่ง', needWork:'ใส่งานที่ต้องแก้', needCrew:'เลือกชุด', needSup:'เลือกผู้ดูแล', needUrg:'เลือกความเร่งด่วน',
     u1:'หยุดแล้วแก้ทันที', u1h:'เสี่ยงความปลอดภัยหรือโครงสร้าง ห้ามทำงานต่อในจุดนี้',
     u2:'แก้ใน 24 ชั่วโมง', u2h:'ขวางงานถัดไปในสัปดาห์นี้',
     u3:'แก้ใน 3 วัน', u3h:'ไม่ขวางงาน แต่ต้องแก้',
@@ -134,8 +141,8 @@ const T = {
   },
   en: {
     title:'Report a defect', loc:'Location', locPh:'e.g. Beam B3, level 2', work:'Work / problem', workPh:'e.g. Stirrups missing',
-    crew:'Responsible crew', crewPh:'Select crew', urg:'Urgency', send:'Send', sending:'Sending...',
-    needLoc:'Enter the location', needWork:'Enter the problem', needCrew:'Select a crew', needUrg:'Select urgency',
+    crew:'Responsible crew', crewPh:'Select crew', sup:'Supervisor (follows up)', supPh:'Select supervisor', urg:'Urgency', send:'Send', sending:'Sending...',
+    needLoc:'Enter the location', needWork:'Enter the problem', needCrew:'Select a crew', needSup:'Select a supervisor', needUrg:'Select urgency',
     u1:'Stop and fix now', u1h:'Safety or structural risk. Do not continue work here',
     u2:'Fix within 24 hours', u2h:'Blocks the next work this week',
     u3:'Fix within 3 days', u3h:'Does not block work, but must be fixed',
@@ -161,6 +168,13 @@ function uuid(){
   return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
+function fillSelect(el, list, placeholder){
+  const cur = el.value;
+  el.innerHTML = '<option value="">' + placeholder + '</option>' +
+    list.map(c => '<option>' + String(c).replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</option>').join('');
+  if (list.indexOf(cur) > -1) el.value = cur;
+}
+
 function applyText(){
   document.documentElement.lang = lang;
   document.title = t('title'); $('ttl').textContent = t('title');
@@ -169,10 +183,9 @@ function applyText(){
   $('l_crew').textContent = t('crew'); $('l_urg').textContent = t('urg');
   $('send').textContent = sending ? t('sending') : t('send');
   $('closeBtn').textContent = t('close');
-  const cur = $('crew').value;
-  $('crew').innerHTML = '<option value="">' + t('crewPh') + '</option>' +
-    CONFIG.CREWS.map(c => '<option>' + c.replace(/</g,'&lt;') + '</option>').join('');
-  $('crew').value = cur;
+  $('l_sup').textContent = t('sup');
+  fillSelect($('crew'), CONFIG.CREWS, t('crewPh'));
+  fillSelect($('sup'), CONFIG.SUPERVISORS, t('supPh'));
   drawUrg();
 }
 
@@ -191,6 +204,7 @@ $('urgList').addEventListener('click', e => {
 });
 ['loc','work'].forEach(id => $(id).addEventListener('input', () => $('e_' + id).textContent = ''));
 $('crew').addEventListener('change', () => $('e_crew').textContent = '');
+$('sup').addEventListener('change', () => $('e_sup').textContent = '');
 
 function banner(kind, msg){
   const b = $('banner'); b.className = 'banner' + (kind ? ' ' + kind : ''); b.textContent = msg || '';
@@ -201,6 +215,7 @@ function validate(){
   if (!$('loc').value.trim())  { $('e_loc').textContent = t('needLoc'); ok = false; }
   if (!$('work').value.trim()) { $('e_work').textContent = t('needWork'); ok = false; }
   if (!$('crew').value)        { $('e_crew').textContent = t('needCrew'); ok = false; }
+  if (!$('sup').value)         { $('e_sup').textContent = t('needSup'); ok = false; }
   if (sel < 0)                 { $('e_urg').textContent = t('needUrg'); ok = false; }
   return ok;
 }
@@ -215,10 +230,10 @@ async function submit(){
   sending = true; $('send').disabled = true; $('send').textContent = t('sending');
   if (!requestId) requestId = uuid();
 
-  const loc = $('loc').value.trim(), work = $('work').value.trim(), crew = $('crew').value;
+  const loc = $('loc').value.trim(), work = $('work').value.trim(), crew = $('crew').value, sup = $('sup').value;
   const u = URG[sel];
   const payload = {
-    requestId, idToken, loc, work, crew,
+    action: 'submit', requestId, idToken, loc, work, crew, supervisor: sup,
     urgency: u.n, urgencyText: T.th[u.k],
     lang, sentAt: new Date().toISOString()
   };
@@ -242,7 +257,7 @@ async function submit(){
       if (liff.isInClient() && type && type !== 'none' && liff.isApiAvailable('sendMessages')) {
         await liff.sendMessages([{
           type: 'text',
-          text: 'แจ้ง Defect ' + data.id + ' | ' + loc + ' | ' + work + ' | ' + crew + ' | ' + T.th[u.k]
+          text: 'แจ้ง Defect ' + data.id + ' | ' + loc + ' | ' + work + ' | ' + crew + ' | ผู้ดูแล ' + sup + ' | ' + T.th[u.k]
         }]);
         sentToChat = true;
       }
@@ -265,6 +280,28 @@ $('closeBtn').addEventListener('click', () => {
   window.close();
 });
 
+/* ดึงรายชื่อชุดและผู้ดูแลล่าสุดจากชีตผ่าน Make (ต้องตรวจตัวตนก่อน) ถ้าไม่ได้ ใช้รายชื่อสำรองใน CONFIG */
+async function loadLists(){
+  const idToken = liff.getIDToken(); if (!idToken) return;
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(CONFIG.ENDPOINT, {
+      method: 'POST', headers: {'Content-Type': 'text/plain;charset=UTF-8'},
+      body: JSON.stringify({action: 'lists', idToken}), signal: ctrl.signal
+    });
+    if (res.status === 401 || res.status === 403){
+      banner('err-b', t('errAuth')); $('send').disabled = true; return;
+    }
+    const d = await res.json();
+    if (d && d.ok){
+      if (Array.isArray(d.crews) && d.crews.length) CONFIG.CREWS = d.crews.map(String);
+      if (Array.isArray(d.supervisors) && d.supervisors.length) CONFIG.SUPERVISORS = d.supervisors.map(String);
+      applyText();
+    }
+  } catch (_) { /* ใช้รายชื่อสำรอง */ }
+  finally { clearTimeout(timer); }
+}
+
 async function boot(){
   if (/^ใส่/.test(CONFIG.LIFF_ID) || /^ใส่/.test(CONFIG.ENDPOINT)){
     $('boot').textContent = t('errCfg'); return;
@@ -277,6 +314,7 @@ async function boot(){
     try { profile = await liff.getProfile(); $('who').textContent = profile.displayName || ''; } catch (_) {}
     applyText();
     $('boot').classList.add('hide'); $('form').classList.remove('hide');
+    loadLists();
   } catch (e) {
     $('boot').textContent = t('errLogin');
   }
