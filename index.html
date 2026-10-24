@@ -137,7 +137,7 @@ const T = {
     call1:'ระดับ 1: โทรแจ้งวิศวกรทันทีด้วย อย่ารอแค่ข้อความในไลน์',
     ok:'บันทึกแล้ว', okMsg:'ส่งเข้ากลุ่มแล้ว ถ่ายรูปจุดที่บกพร่องแล้วส่งในกลุ่มพร้อมเลขที่ด้านบน',
     okNoChat:'บันทึกแล้ว แต่ส่งข้อความเข้ากลุ่มไม่ได้ ให้พิมพ์เลขที่นี้ในกลุ่มเอง',
-    close:'ปิด', errNet:'ส่งไม่สำเร็จ ลองอีกครั้ง', errAuth:'ยังไม่ได้รับสิทธิ์ใช้ฟอร์มนี้ ติดต่อผู้ดูแล',
+    close:'ปิด', errNet:'ส่งไม่สำเร็จ ลองอีกครั้ง', errAuth:'ใช้ฟอร์มไม่ได้ อาจเปิดหน้านี้ค้างนานเกินไป ให้ปิดแล้วเปิดใหม่ ถ้ายังไม่ได้ติดต่อผู้ดูแล', errExpired:'หน้านี้เปิดค้างนานเกินไป ปิดแล้วเปิดฟอร์มใหม่ (ข้อมูลที่พิมพ์ไว้จะหายไป)',
     errLogin:'เปิดฟอร์มจากลิงก์ในกลุ่มไลน์เท่านั้น', errCfg:'ยังไม่ได้ตั้งค่าฟอร์ม (LIFF ID / Endpoint)'
   },
   my: {}, km: {}
@@ -213,6 +213,11 @@ async function submit(){
   if (!validate()) return;
   const idToken = liff.getIDToken();
   if (!idToken){ liff.login(); return; }
+  /* ID Token ของ LINE หมดอายุประมาณ 1 ชั่วโมง ถ้าเปิดหน้าค้างไว้นาน ต้องเปิดใหม่ */
+  try {
+    const dec = liff.getDecodedIDToken && liff.getDecodedIDToken();
+    if (dec && dec.exp && dec.exp * 1000 < Date.now() + 30000){ banner('err-b', t('errExpired')); return; }
+  } catch (_) {}
 
   sending = true; $('send').disabled = true; $('send').textContent = t('sending');
   if (!requestId) requestId = uuid();
@@ -296,6 +301,15 @@ async function boot(){
   try {
     await liff.init({liffId: CONFIG.LIFF_ID});
     if (!liff.isLoggedIn()){ liff.login(); return; }
+    /* เปิดจากเบราว์เซอร์ภายนอก (เช่น คอมพิวเตอร์) LIFF จำ Token เก่าไว้ ถ้าหมดอายุแล้วให้ล็อกอินใหม่เอง 1 ครั้ง */
+    try {
+      const dec = liff.getDecodedIDToken && liff.getDecodedIDToken();
+      const stale = dec && dec.exp && dec.exp * 1000 < Date.now() + 60000;
+      if (stale && !liff.isInClient()){
+        const n = Number(sessionStorage.getItem('relogin') || 0);
+        if (n < 1){ sessionStorage.setItem('relogin', String(n + 1)); liff.logout(); liff.login(); return; }
+      } else { sessionStorage.removeItem('relogin'); }
+    } catch (_) {}
     const l = String(liff.getLanguage() || 'th').slice(0, 2);
     /* ใช้ภาษาไทยเสมอ จนกว่าจะเติมคำแปลพม่า/เขมรที่ตรวจแล้ว (ไม่ใช้อังกฤษ เพราะช่างอ่านไม่ออก) */
     lang = (T[l] && Object.keys(T[l]).length > 0) ? l : 'th';
