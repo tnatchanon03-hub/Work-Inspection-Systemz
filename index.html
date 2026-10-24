@@ -121,9 +121,10 @@ const CONFIG = {
   SUPERVISORS: ['ช่างโต้ง', 'ช่างนน', 'ช่างเทียน', 'ช่างเอี่ยว']
 };
 
-/* ===================== ข้อความหลายภาษา =====================
-   ภาษาที่ยังไม่เติมจะใช้อังกฤษแทน
-   ภาษาพม่า (my) และเขมร (km) ให้เติมหลังหัวหน้าชุดตรวจคำแปลแล้วเท่านั้น */
+/* ===================== ข้อความ =====================
+   ตอนนี้ใช้ภาษาไทยทั้งหมด
+   ภาษาพม่า (my) และเขมร (km) ให้เติมหลังหัวหน้าชุดตรวจคำแปลแล้วเท่านั้น
+   ภาษาที่ยังไม่เติมหรือเติมไม่ครบ จะใช้ภาษาไทยแทน */
 const T = {
   th: {
     title:'แจ้ง Defect', loc:'ตำแหน่ง', locPh:'เช่น คาน B3 ชั้น 2', work:'งาน', workPh:'เช่น เหล็กปลอกไม่ครบ',
@@ -139,20 +140,6 @@ const T = {
     close:'ปิด', errNet:'ส่งไม่สำเร็จ ลองอีกครั้ง', errAuth:'ยังไม่ได้รับสิทธิ์ใช้ฟอร์มนี้ ติดต่อผู้ดูแล',
     errLogin:'เปิดฟอร์มจากลิงก์ในกลุ่มไลน์เท่านั้น', errCfg:'ยังไม่ได้ตั้งค่าฟอร์ม (LIFF ID / Endpoint)'
   },
-  en: {
-    title:'Report a defect', loc:'Location', locPh:'e.g. Beam B3, level 2', work:'Work / problem', workPh:'e.g. Stirrups missing',
-    crew:'Responsible crew', crewPh:'Select crew', sup:'Supervisor (follows up)', supPh:'Select supervisor', urg:'Urgency', send:'Send', sending:'Sending...',
-    needLoc:'Enter the location', needWork:'Enter the problem', needCrew:'Select a crew', needSup:'Select a supervisor', needUrg:'Select urgency',
-    u1:'Stop and fix now', u1h:'Safety or structural risk. Do not continue work here',
-    u2:'Fix within 24 hours', u2h:'Blocks the next work this week',
-    u3:'Fix within 3 days', u3h:'Does not block work, but must be fixed',
-    u4:'Punch list', u4h:'Fix after other defects are closed, before handover',
-    call1:'Level 1: also call the engineer right away. Do not rely on the chat message only',
-    ok:'Saved', okMsg:'Posted to the group. Take a photo of the defect and send it in the group with the number above',
-    okNoChat:'Saved, but the group message could not be sent. Type this number in the group yourself',
-    close:'Close', errNet:'Could not send. Try again', errAuth:'You do not have access to this form. Contact the admin',
-    errLogin:'Open this form from the link in the LINE group', errCfg:'Form is not configured (LIFF ID / Endpoint)'
-  },
   my: {}, km: {}
 };
 const URG = [
@@ -161,7 +148,7 @@ const URG = [
 
 let lang = 'th', sel = -1, sending = false, requestId = null, profile = null;
 const $ = id => document.getElementById(id);
-const t = k => (T[lang] && T[lang][k]) || T.en[k] || T.th[k] || k;
+const t = k => (T[lang] && T[lang][k]) || T.th[k] || k;
 
 function uuid(){
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
@@ -310,7 +297,8 @@ async function boot(){
     await liff.init({liffId: CONFIG.LIFF_ID});
     if (!liff.isLoggedIn()){ liff.login(); return; }
     const l = String(liff.getLanguage() || 'th').slice(0, 2);
-    lang = T[l] ? l : 'en';
+    /* ใช้ภาษาไทยเสมอ จนกว่าจะเติมคำแปลพม่า/เขมรที่ตรวจแล้ว (ไม่ใช้อังกฤษ เพราะช่างอ่านไม่ออก) */
+    lang = (T[l] && Object.keys(T[l]).length > 0) ? l : 'th';
     try { profile = await liff.getProfile(); $('who').textContent = profile.displayName || ''; } catch (_) {}
     applyText();
     $('boot').classList.add('hide'); $('form').classList.remove('hide');
